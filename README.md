@@ -1,2 +1,2 @@
 # gesture-control-gif-7001
-Application control via gesture recognition
+Application control via hand gesture recognition
