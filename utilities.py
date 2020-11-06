@@ -9,6 +9,14 @@ top, left, bottom, right = 0, 0, 300, 300
 
 
 def make_frame_roi(frame):
+    """Adds rectangle to frame and creates ROIs (regular and gray-scale)
+
+    Args:
+        frame (array-like): Image / frame from camera feed
+
+    Returns:
+        (array-like, array-like, array-like) : (frame wit rectangle, roi, gray-scale roi)
+    """
 
     # flip image so brain doesn't fart
     frame = cv2.flip(frame, 1)
