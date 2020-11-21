@@ -1,6 +1,7 @@
 # Imports
 import cv2
-import logging
+from sklearn.metrics import pairwise
+import numpy as np
 
 # Globals
 background = None
@@ -44,7 +45,7 @@ def identifyhand(image, bg, threshold):
         threshold (float): threshold for countours
 
     Returns:
-        array-like : The largest contour in the ROI
+        array-like, array-like : The largest contour in the ROI, thresholded hand
     """
     diff = cv2.absdiff(bg.astype("uint8"), image)
 
@@ -60,7 +61,7 @@ def identifyhand(image, bg, threshold):
     else:
         # based on contour area, get the maximum contour which is the hand
         hand = max(cnts, key=cv2.contourArea)
-        return hand
+        return hand, thresholded
 
 def average(image, bg, weight):
     """Adds image to the average of the background with the weight specified
@@ -84,3 +85,49 @@ def average(image, bg, weight):
     cv2.accumulateWeighted(image, bg, weight)
     
     return bg
+
+def countFingers(handContour, thresholded):
+    """ Computes the numbers of finger raised in the hand contour provided
+    
+
+    Args:
+        handContour (array-like): numpy array of points  contouring the hand
+        thresholded (array-like): image thresholded of hand
+
+    Returns:
+        (int, array-like): number of fingers raised, convex hull
+
+    """
+    # find the convex hull of the segmented hand region
+    chull = cv2.convexHull(handContour)
+    
+    
+    # find the most extreme points in the convex hull
+    extreme_top    = tuple(chull[chull[:, :, 1].argmin()][0])
+    extreme_bottom = tuple(chull[chull[:, :, 1].argmax()][0])
+    extreme_left   = tuple(chull[chull[:, :, 0].argmin()][0])
+    extreme_right  = tuple(chull[chull[:, :, 0].argmax()][0])
+    
+    # find the center of the hull
+    cX = int((extreme_left[0] + extreme_right[0]) / 2)
+    cY = int((extreme_top[1] + extreme_bottom[1]) / 2)
+    
+    
+    # find the maximum euclidean distance between the center of the palm
+    # and the most extreme points of the convex hull
+    distances = pairwise.euclidean_distances([(cX, cY)], Y=[extreme_left, extreme_right, extreme_top, extreme_bottom])[0]
+    max_distance = distances[distances.argmax()]
+    
+    # calculate the radius of the circle with 80% of the max euclidean distance obtained
+    radius = int(0.8 * max_distance)
+    
+    #initisalize circle
+    circular_roi = np.zeros(thresholded.shape[:2], dtype="uint8")
+    cv2.circle(circular_roi, (cX, cY), radius, 255, 1)
+    
+    #bitwise and of thresholded hand and circle
+    circular_roi = cv2.bitwise_and(thresholded, thresholded, mask=circular_roi)
+    
+    (cnts, _) = cv2.findContours(circular_roi.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    
+    return len(cnts)-1, chull

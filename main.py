@@ -35,11 +35,12 @@ while rval:
 
         if hand is not None:
             
-            # find the convex hull of the segmented hand region
-            chull = cv2.convexHull(hand)
+            
+            num, chull = countFingers(hand[0], hand[1])
             
             # draw the segmented region and display the frame
             cv2.drawContours(frame, [chull], -1, (0, 0, 255))
+            cv2.putText(frame,str(num), (0,30), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255), 4)
 
     # Draw rectangle on image
     cv2.rectangle(frame, (top, left), (bottom, right), (255, 0, 0), 1)
