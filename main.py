@@ -12,6 +12,9 @@ cv2.namedWindow("Camera Feed")
 
 camera = cv2.VideoCapture(0)
 
+#Keep constant exposure
+camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+
 if camera.isOpened():  # try to get the first frame
     rval, frame = camera.read()
 else:
@@ -28,12 +31,15 @@ while rval:
             bg = average(roi_gray, bg, 0.5)
     else:
     
-        hand = identifyhand(roi_gray, bg, 10)
+        hand = identifyhand(roi_gray, bg, 25)
 
         if hand is not None:
             
+            # find the convex hull of the segmented hand region
+            chull = cv2.convexHull(hand)
+            
             # draw the segmented region and display the frame
-            cv2.drawContours(frame, hand, -1, (0, 0, 255))
+            cv2.drawContours(frame, [chull], -1, (0, 0, 255))
 
     # Draw rectangle on image
     cv2.rectangle(frame, (top, left), (bottom, right), (255, 0, 0), 1)
