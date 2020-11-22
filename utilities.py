@@ -4,8 +4,8 @@ from sklearn.metrics import pairwise
 import numpy as np
 
 # Globals
-background = None
 top, left, bottom, right = 0, 0, 300, 300
+KERNEL = np.ones((5, 5), np.uint8)
 
 
 def make_frame_roi(frame):
@@ -59,7 +59,7 @@ def identify_hand(image, bg, threshold):
 
     # return None, if no contours detected
     if len(cnts) == 0:
-        return None
+        return None, None
     else:
         # based on contour area, get the maximum contour which is the hand
         hand = max(cnts, key=cv2.contourArea)
@@ -138,3 +138,18 @@ def count_fingers(hand_contour, thresholded):
 
     return len(cnts) - 1, chull
 
+
+def apply_skin_mask(image):
+    # Skin mask code to detect skin color and basically boost it
+    hsvim = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower = np.array([0, 48, 80], dtype="uint8")
+    upper = np.array([20, 255, 255], dtype="uint8")
+    skinRegionHSV = cv2.inRange(hsvim, lower, upper)
+    blurred = cv2.blur(skinRegionHSV, (2, 2))
+
+    # Apply treshold on skin mask to extract skin colored objects
+    ret, thresholded = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY)
+
+    # Tried to apply opening and closing but it makes the image more grainy, leaving details out and it messes up the model
+
+    return thresholded
