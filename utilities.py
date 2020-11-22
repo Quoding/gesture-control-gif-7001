@@ -29,14 +29,14 @@ def make_frame_roi(frame):
 
     # Gray-scale ROI
     roi_gray = cv2.cvtColor(roi.copy(), cv2.COLOR_BGR2GRAY)
-    
-    #Blur to keep low frequencies
+
+    # Blur to keep low frequencies
     roi_gray = cv2.GaussianBlur(roi_gray, (7, 7), 0)
 
     return frame, roi, roi_gray
 
 
-def identifyhand(image, bg, threshold):
+def identify_hand(image, bg, threshold):
     """Locate the contours of the hand
 
     Args:
@@ -53,7 +53,9 @@ def identifyhand(image, bg, threshold):
     thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)[1]
 
     # get the contours in the thresholded image
-    (cnts, _) = cv2.findContours(thresholded.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    (cnts, _) = cv2.findContours(
+        thresholded.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     # return None, if no contours detected
     if len(cnts) == 0:
@@ -62,6 +64,7 @@ def identifyhand(image, bg, threshold):
         # based on contour area, get the maximum contour which is the hand
         hand = max(cnts, key=cv2.contourArea)
         return hand, thresholded
+
 
 def average(image, bg, weight):
     """Adds image to the average of the background with the weight specified
@@ -75,7 +78,7 @@ def average(image, bg, weight):
         (array-like): the resulting bg
 
     """
-    
+
     # initialize the background
     if bg is None:
         bg = image.copy().astype("float")
@@ -83,15 +86,16 @@ def average(image, bg, weight):
 
     # compute weighted average, accumulate it and update the background
     cv2.accumulateWeighted(image, bg, weight)
-    
+
     return bg
 
-def countFingers(handContour, thresholded):
+
+def count_fingers(hand_contour, thresholded):
     """ Computes the numbers of finger raised in the hand contour provided
     
 
     Args:
-        handContour (array-like): numpy array of points  contouring the hand
+        hand_contour (array-like): numpy array of points  contouring the hand
         thresholded (array-like): image thresholded of hand
 
     Returns:
@@ -99,35 +103,38 @@ def countFingers(handContour, thresholded):
 
     """
     # find the convex hull of the segmented hand region
-    chull = cv2.convexHull(handContour)
-    
-    
+    chull = cv2.convexHull(hand_contour)
+
     # find the most extreme points in the convex hull
-    extreme_top    = tuple(chull[chull[:, :, 1].argmin()][0])
+    extreme_top = tuple(chull[chull[:, :, 1].argmin()][0])
     extreme_bottom = tuple(chull[chull[:, :, 1].argmax()][0])
-    extreme_left   = tuple(chull[chull[:, :, 0].argmin()][0])
-    extreme_right  = tuple(chull[chull[:, :, 0].argmax()][0])
-    
+    extreme_left = tuple(chull[chull[:, :, 0].argmin()][0])
+    extreme_right = tuple(chull[chull[:, :, 0].argmax()][0])
+
     # find the center of the hull
     cX = int((extreme_left[0] + extreme_right[0]) / 2)
     cY = int((extreme_top[1] + extreme_bottom[1]) / 2)
-    
-    
+
     # find the maximum euclidean distance between the center of the palm
     # and the most extreme points of the convex hull
-    distances = pairwise.euclidean_distances([(cX, cY)], Y=[extreme_left, extreme_right, extreme_top, extreme_bottom])[0]
+    distances = pairwise.euclidean_distances(
+        [(cX, cY)], Y=[extreme_left, extreme_right, extreme_top, extreme_bottom]
+    )[0]
     max_distance = distances[distances.argmax()]
-    
+
     # calculate the radius of the circle with 80% of the max euclidean distance obtained
     radius = int(0.8 * max_distance)
-    
-    #initisalize circle
+
+    # initisalize circle
     circular_roi = np.zeros(thresholded.shape[:2], dtype="uint8")
     cv2.circle(circular_roi, (cX, cY), radius, 255, 1)
-    
-    #bitwise and of thresholded hand and circle
+
+    # bitwise and of thresholded hand and circle
     circular_roi = cv2.bitwise_and(thresholded, thresholded, mask=circular_roi)
-    
-    (cnts, _) = cv2.findContours(circular_roi.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    
-    return len(cnts)-1, chull
+
+    (cnts, _) = cv2.findContours(
+        circular_roi.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+    )
+
+    return len(cnts) - 1, chull
+
