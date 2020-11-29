@@ -2,6 +2,7 @@
 import cv2
 from sklearn.metrics import pairwise
 import numpy as np
+import os
 
 # Globals
 top, left, bottom, right = 0, 0, 300, 300
@@ -139,11 +140,19 @@ def count_fingers(hand_contour, thresholded):
     return len(cnts) - 1, chull
 
 
-def apply_skin_mask(image):
+def apply_skin_mask(image, lower_bound=[0, 48, 80], upper_bound=[20, 255, 255]):
+    """Applies a skin mask filter to the image, extracting only regions having a skin color corresponding to the skin mask
+
+    Args:
+        image (array-like): image to apply skin mask to
+
+    Returns:
+        array-like: image with skin mask applied
+    """
     # Skin mask code to detect skin color and basically boost it
     hsvim = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower = np.array([0, 48, 80], dtype="uint8")
-    upper = np.array([20, 255, 255], dtype="uint8")
+    lower = np.array(lower_bound, dtype="uint8")
+    upper = np.array(upper_bound, dtype="uint8")
     skinRegionHSV = cv2.inRange(hsvim, lower, upper)
     blurred = cv2.blur(skinRegionHSV, (2, 2))
 
@@ -153,3 +162,40 @@ def apply_skin_mask(image):
     # Tried to apply opening and closing but it makes the image more grainy, leaving details out and it messes up the model
 
     return thresholded
+
+
+def get_calibration_params(pattern_size=(6, 9)):
+    """Fetches calibration parameters for camera given a set of picture of a calibration target located in ./calib_pics/".
+
+    Args:
+        pattern_size (tuple, optional): Pattern size according to cv2.findChessboardCorner. Defaults to (6, 9).
+
+    Returns:
+        array-like: output of cv2.calibrateCamera(), parameters of camera calibration
+    """
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    h, w = pattern_size
+    objp = np.zeros((h * w, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:w, 0:h].T.reshape(-1, 2)
+    objpoints = []
+    imgpoints = []
+    filenames = os.listdir("calib_pics")
+    for filename in filenames:
+        filename = "calib_pics/{}".format(filename)
+        image = cv2.imread(filename)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        retval, corners = cv2.findChessboardCorners(gray, pattern_size)
+        if retval:
+            objpoints.append(objp)
+            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            imgpoints.append(corners2)
+
+    if not imgpoints:
+        print(
+            "Calibration could not be done. Perhaps no pictures were in the ./calib_pics/ ?"
+        )
+        return False, False, False, False, False
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+        objpoints, imgpoints, gray.shape[::-1], None, None
+    )
+    return ret, mtx, dist, rvecs, tvecs
