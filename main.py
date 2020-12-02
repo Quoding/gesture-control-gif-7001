@@ -11,6 +11,9 @@ bg = None
 
 cv2.namedWindow("Camera Feed")
 
+# Load model from https://www.kaggle.com/suhasrao/handgesturerecognition-with-99-accuracy?select=handgesturerecog_model.h5
+model = load_model("model/handgesturerecog_model.h5")
+
 camera = cv2.VideoCapture(0)
 
 # Keep constant exposure
