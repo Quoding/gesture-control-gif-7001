@@ -11,7 +11,6 @@ import vlc
 # importing pafy module 
 import pafy 
 import youtube_dl
-import subprocess
   
 # url of the video 
 url = "https://www.youtube.com/watch?v=_Eh7SaexZnI"
