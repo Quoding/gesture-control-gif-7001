@@ -1,11 +1,17 @@
 # Imports
+import os
+
 import cv2
 from sklearn.metrics import pairwise
 import numpy as np
+import vlc
+import pafy
+import youtube_dl
 
 # Globals
 top, left, bottom, right = 0, 0, 300, 300
 KERNEL = np.ones((5, 5), np.uint8)
+VIDEO_URL = "https://www.youtube.com/watch?v=_Eh7SaexZnI"
 
 
 def make_frame_roi(frame):
@@ -139,11 +145,19 @@ def count_fingers(hand_contour, thresholded):
     return len(cnts) - 1, chull
 
 
-def apply_skin_mask(image):
+def apply_skin_mask(image, lower_bound=[0, 48, 80], upper_bound=[20, 255, 255]):
+    """Applies a skin mask filter to the image, extracting only regions having a skin color corresponding to the skin mask
+
+    Args:
+        image (array-like): image to apply skin mask to
+
+    Returns:
+        array-like: image with skin mask applied
+    """
     # Skin mask code to detect skin color and basically boost it
     hsvim = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower = np.array([0, 48, 80], dtype="uint8")
-    upper = np.array([20, 255, 255], dtype="uint8")
+    lower = np.array(lower_bound, dtype="uint8")
+    upper = np.array(upper_bound, dtype="uint8")
     skinRegionHSV = cv2.inRange(hsvim, lower, upper)
     blurred = cv2.blur(skinRegionHSV, (2, 2))
 
@@ -153,3 +167,64 @@ def apply_skin_mask(image):
     # Tried to apply opening and closing but it makes the image more grainy, leaving details out and it messes up the model
 
     return thresholded
+
+
+def do_action(gesture, media, volume):
+    """Execute action on the media player based on the predicted gesture
+
+    Args:
+        gesture (int): predicted gesture
+        media (object): media player object
+    Returns:
+        int: New volume value
+    """
+    if gesture == 3 or gesture == 5:  # fist and thumb are similar
+        media.pause()
+    elif gesture == 1:  # palm
+        media.play()
+    elif gesture == 2 or gesture == 6:  # l and index are similar
+        volume = min(volume + 10, 100)
+        media.audio_set_volume(volume)
+    elif gesture == 9:  # C
+        volume = max(0, volume - 10)
+        media.audio_set_volume(volume)
+    else:
+        print("This gesture is not mapped to an action")
+
+    return volume
+
+
+def setup_video():
+    """
+    Setup media player
+
+    Returns:
+        object: Media player object
+    """
+    # creating pafy object of the video
+    video = pafy.new(VIDEO_URL)
+    # getting best stream
+    best = video.getbest()
+    # creating vlc media player object
+    media = vlc.MediaPlayer(best.url)
+    # start playing video
+    media.play()
+    return media
+
+
+def get_args():
+    """Parses and return args
+
+    Returns:
+        bool: Value of USE_SKIN, to determine if we use background subtraction or skin mask
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--useskin",
+        help="Change default behavior to using a skin mask instead of background subtraction to extract the hand",
+        action="store_true",
+    )
+    args = parser.parse_args()
+    return args.useskin
