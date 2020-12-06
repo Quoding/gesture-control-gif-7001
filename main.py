@@ -16,9 +16,6 @@ import youtube_dl
 url = "https://www.youtube.com/watch?v=_Eh7SaexZnI"
 
 # Background
-bg = None
-
-cv2.namedWindow("Camera Feed")
 
 # Load model from https://www.kaggle.com/suhasrao/handgesturerecognition-with-99-accuracy?select=handgesturerecog_model.h5
 model = load_model("model/handgesturerecog_model.h5")
@@ -26,6 +23,9 @@ class_names = ["down", "palm", "l", "fist", "fist_moved", "thumb", "index", "ok"
 identified = ""
 
 camera = cv2.VideoCapture(0)
+
+# Load model from https://www.kaggle.com/suhasrao/handgesturerecognition-with-99-accuracy?select=handgesturerecog_model.h5
+model = load_model("model/handgesturerecog_model.h5")
 
 # Keep constant exposure
 camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
@@ -50,6 +50,7 @@ else:
     rval = False
 
 num_frames = 0
+
 bg_frames = 0
 preds = []
 bg = None
@@ -59,6 +60,7 @@ use_skin = False
 # regrouper les classes 3 4 et 5
 
 while rval:
+
     if num_frames == 30:
         if len(preds) > 0:
             gesture = max(set(preds), key=preds.count)
@@ -84,6 +86,8 @@ while rval:
     rval, frame = camera.read()
 
     frame, roi, roi_gray = make_frame_roi(frame)
+
+
     
     if bg_frames < 30:
         bg = average(roi_gray, bg, 0.5)
@@ -109,7 +113,6 @@ while rval:
 
         
 
-
     # Draw rectangle on image
     cv2.rectangle(frame, (top, left), (bottom, right), (255, 0, 0), 1)
     cv2.putText(
@@ -132,9 +135,6 @@ while rval:
     key = cv2.waitKey(20)
     if key == 27:  # exit on ESC
         break
-    if key == 114:  # Reload background on r
-        bg = None
-        num_frames = 0
 
 cv2.destroyAllWindows()
 camera.release()
