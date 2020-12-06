@@ -9,8 +9,8 @@ from tensorflow.keras.models import load_model
 
 media = setup_video()
 identified = ""
-num_frames = 0
 bg_frames = 0
+wait_frames = 0
 preds = []
 bg = None
 class_names = [
@@ -26,6 +26,7 @@ class_names = [
     "c",
 ]
 volume = 50
+media.audio_set_volume(volume)
 USE_SKIN = get_args()
 # Load model from https://www.kaggle.com/suhasrao/handgesturerecognition-with-99-accuracy?select=handgesturerecog_model.h5
 model = load_model("model/handgesturerecog_model.h5")
@@ -51,45 +52,46 @@ while bg_frames < 30 and not USE_SKIN:
 
 
 while rval:
-    if num_frames == 60:
-        if len(preds) > 0:
-            # Filter problematic class
-            preds = [pred for pred in preds if pred != 7]
-            try:
-                gesture = max(set(preds), key=preds.count)
-                print("Model predicted: " + str(gesture))
-                identified = class_names[gesture]
-                volume = do_action(gesture, media, volume)
-            except:
-                print("No valid predictions in this set")
-                pass
-
-        else:
-            identified = ""
+    if len(preds) >= 60 and wait_frames <= 0:
+        gesture = max(set(preds), key=preds.count)
+        identified = class_names[gesture]
+        print(identified)
+        volume = do_action(gesture, media, volume)
+        wait_frames = 30
         preds = []
-        num_frames = 0
+
+    elif wait_frames <= 0:
+        identified = ""
+
+    wait_frames -= 1
+
     rval, frame = camera.read()
 
     frame, roi, roi_gray = make_frame_roi(frame)
 
     if USE_SKIN:
-        hand = apply_skin_mask(roi)
+        skinmask = apply_skin_mask(roi)
+        hand = cv2.bitwise_and(roi_gray, roi_gray, mask=skinmask)
+
     else:
-        hand = identify_hand(roi_gray, bg, 25)
+        hand, thresholded = identify_hand(roi_gray, bg, 25)
         if hand is not None:
-            if cv2.countNonZero(hand[1]) == 0:
+            if cv2.countNonZero(thresholded) == 0:
                 hand = None
             else:
-                hand = cv2.bitwise_and(roi_gray, roi_gray, mask=hand[1])
+                hand = cv2.bitwise_and(roi_gray, roi_gray, mask=thresholded)
 
     if hand is not None:
         cv2.imshow("mask", hand)
-
-        dim = (128, 128)
-        hand = cv2.resize(hand, dim)
-        hand = np.expand_dims(hand, axis=2)
-        hand = np.expand_dims(hand, axis=0)
-        preds.append(np.argmax(model.predict(hand)))
+        if wait_frames <= 0:
+            dim = (128, 128)
+            hand = cv2.resize(hand, dim)
+            hand = np.expand_dims(hand, axis=2)
+            hand = np.expand_dims(hand, axis=0)
+            pred = np.argmax(model.predict(hand))
+            # Do not append classes which are problematic
+            if pred not in [0, 7]:
+                preds.append(pred)
 
     # Draw rectangle on image
     cv2.rectangle(frame, (top, left), (bottom, right), (255, 0, 0), 1)
@@ -97,13 +99,10 @@ while rval:
         frame, identified, (200, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 4,
     )
 
-    # update number of frames
-    num_frames += 1
-
     # Draw contours over the ROI
     cv2.imshow("Camera Feed", frame)
 
-    key = cv2.waitKey(20)
+    key = cv2.waitKey(1)
     if key == 27:  # exit on ESC
         break
 

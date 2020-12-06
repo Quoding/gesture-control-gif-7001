@@ -65,7 +65,7 @@ def identify_hand(image, bg, threshold):
 
     # return None, if no contours detected
     if len(cnts) == 0:
-        return None, None
+        return None, thresholded
     else:
         # based on contour area, get the maximum contour which is the hand
         hand = max(cnts, key=cv2.contourArea)
@@ -167,6 +167,31 @@ def apply_skin_mask(image, lower_bound=[0, 48, 80], upper_bound=[20, 255, 255]):
     # Tried to apply opening and closing but it makes the image more grainy, leaving details out and it messes up the model
 
     return thresholded
+
+
+def HSV_segment(image, lower_bound=[0, 10, 60], upper_bound=[20, 150, 255]):
+    """Applies a skin mask filter to the image, extracting only regions having a skin color corresponding to the skin mask
+
+    Args:
+        image (array-like): image to apply skin mask to
+
+    Returns:
+        array-like: image with skin mask applied
+    """
+    # Skin mask code to detect skin color and basically boost it
+    hsvim = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower = np.array(lower_bound, dtype="uint8")
+    upper = np.array(upper_bound, dtype="uint8")
+    skin_region_HSV = cv2.inRange(hsvim, lower, upper)
+
+    # Apply treshold on skin mask to extract skin colored objects
+    ret, thresholded = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+    skin_mask = cv.morphologyEx(hsvim, cv.MORPH_CLOSE, kernel)
+    skin_mask = cv2.GaussianBlur(skin_mask, (3, 3), 0)
+
+    return skin_mask
 
 
 def do_action(gesture, media, volume):
